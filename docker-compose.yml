@@ -1,19 +1,71 @@
-version: '2.0'
-
 services:
-  db:
-    image: postgres
-    # volumes:
-    #   - /home/db:/var/lib/postgresql/data
-    env_file: 
-      - ./db.env
-
-  web:
-    build: .
-    image: micropyramid/django-crm:1
-    env_file: 
-      - ./db.env
+  # Backend Django
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: django-crm-backend
+    env_file:
+      - ./backend/.env
     ports:
-      - "8001:8000"
+      - "8000:8000"
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     depends_on:
-      - db
+      redis:
+        condition: service_started
+    networks:
+      - crm-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 crm.wsgi:application"
+
+  # Frontend SvelteKit
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: django-crm-frontend
+    env_file:
+      - ./frontend/.env
+    environment:
+      - PORT=5173
+      - HOST=0.0.0.0
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - crm-network
+    restart: unless-stopped
+
+  # Redis para Celery
+  redis:
+    image: redis:7-alpine
+    container_name: django-crm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  static_volume:
+  media_volume:
+
+networks:
+  crm-network:
+    driver: bridge
