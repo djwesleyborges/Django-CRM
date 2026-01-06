@@ -16,9 +16,7 @@ services:
       redis:
         condition: service_started
     networks:
-      - crm-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - nginx-network
     restart: unless-stopped
     command: >
       sh -c "python manage.py migrate --noinput &&
@@ -40,8 +38,9 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+      - nginx-proxy
     networks:
-      - crm-network
+      - nginx-network
     restart: unless-stopped
 
   # Redis para Celery
@@ -53,7 +52,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - crm-network
+      - nginx-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -65,7 +64,3 @@ volumes:
   redis_data:
   static_volume:
   media_volume:
-
-networks:
-  crm-network:
-    driver: bridge
