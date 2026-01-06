@@ -38,7 +38,6 @@ services:
       - "5173:5173"
     depends_on:
       - backend
-      - nginx-proxy
     networks:
       - nginx-network
     restart: unless-stopped
@@ -64,3 +63,8 @@ volumes:
   redis_data:
   static_volume:
   media_volume:
+
+networks:
+  nginx-network:
+    external: true
+    name: bdvpersonalizados_nginx-network
